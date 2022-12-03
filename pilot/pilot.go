@@ -435,10 +435,22 @@ func (p *Pilot) delContainer(id string) error {
 			}
 			p.tryReload()
 		}
-		time.AfterFunc(15*time.Minute, clean)
+		time.AfterFunc(10*time.Second, clean)
 		return nil
 	}
-
+	
+	if p.piloter.Name() == PILOT_FILEBEAT {
+		clean := func() {
+			log.Infof("Try removing log config %s", id)
+			if err := os.Remove(p.piloter.GetConfPath(id)); err != nil {
+				log.Warnf("removing %s log config failure", id)
+				return
+			}
+			p.tryReload()
+		}
+		time.AfterFunc(10*time.Second, clean)
+		return nil
+	}
 	return p.piloter.OnDestroyEvent(id)
 }
 
