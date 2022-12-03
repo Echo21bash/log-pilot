@@ -1,0 +1,50 @@
+FROM --platform=${TARGETPLATFORM} golang:1.9-alpine3.6 as builder
+ENV PILOT_DIR /go/src/github.com/AliyunContainerService/log-pilot
+ARG TARGETOS TARGETARCH
+ARG GOOS=linux
+ARG GOARCH=$TARGETARCH
+RUN sed -i "s/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g" /etc/apk/repositories
+RUN set -ex && apk add --no-cache make git gcc g++
+WORKDIR $PILOT_DIR
+COPY . $PILOT_DIR
+RUN go install 
+
+FROM --platform=$TARGETPLATFORM alpine:3.6
+ARG TARGETOS TARGETARCH
+ENV FILEBEAT_VERSION=7.8.0
+COPY assets/glibc/glibc-2.26-r0.apk /tmp/
+RUN sed -i "s/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g" /etc/apk/repositories && \
+    apk update && \ 
+    apk add python && \
+    apk add ca-certificates && \
+    apk add wget && \
+    update-ca-certificates && \
+    if [[ ${TARGETARCH} = "amd64" || -z ${TARGETARCH} ]];then \
+        wget https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-${FILEBEAT_VERSION}-linux-x86_64.tar.gz -O /tmp/filebeat.tar.gz; \
+        mkdir /lib64;ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2; apk add --allow-untrusted /tmp/glibc-2.26-r0.apk; \
+    elif [ ${TARGETARCH} = "arm64" ];then \
+        wget https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-${FILEBEAT_VERSION}-linux-arm64.tar.gz -O /tmp/filebeat.tar.gz; \
+        ln -s /lib/ld-musl-aarch64.so.1   /lib/ld-linux-aarch64.so.1; \
+    fi && \
+    mkdir -p /etc/filebeat /var/lib/filebeat /var/log/filebeat /tmp/filebeat && \
+    tar zxf /tmp/filebeat.tar.gz -C /tmp/filebeat --strip-components 1 && \
+    cp -rf /tmp/filebeat/filebeat /usr/bin/ && \
+    cp -rf /tmp/filebeat/fields.yml /etc/filebeat/ && \
+    cp -rf /tmp/filebeat/kibana /etc/filebeat/ && \
+    cp -rf /tmp/filebeat/module /etc/filebeat/ && \
+    cp -rf /tmp/filebeat/modules.d /etc/filebeat/ && \
+    rm -rf /var/cache/apk/* /tmp/filebeat.tar.gz /tmp/filebeat /tmp/glibc-*.apk
+
+COPY --from=builder /go/bin/log-pilot /pilot/pilot
+COPY assets/entrypoint assets/filebeat/ assets/healthz /pilot/
+
+RUN chmod +x /pilot/pilot /pilot/entrypoint /pilot/healthz /pilot/config.filebeat
+
+HEALTHCHECK CMD /pilot/healthz
+
+VOLUME /var/log/filebeat
+VOLUME /var/lib/filebeat
+
+WORKDIR /pilot/
+ENV PILOT_TYPE=filebeat
+ENTRYPOINT ["/pilot/entrypoint"]
