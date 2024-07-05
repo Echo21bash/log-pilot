@@ -176,8 +176,12 @@ if [ -n "$FILEBEAT_OUTPUT" ]; then
 fi
 cat >> $FILEBEAT_CONFIG << EOF
 processors:
-- drop_fields:
-    fields: ["log","host","input","agent","ecs"]
+  - drop_fields:
+      fields: ["log","host","input","agent","ecs"]
+  - drop_event:
+      when:
+        regexp:
+          message: "^$"
 EOF
 
 

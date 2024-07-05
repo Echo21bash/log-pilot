@@ -1,4 +1,4 @@
-FROM golang:1.9-alpine3.6 as builder
+FROM golang:1.9-alpine3.9 as builder
 
 ENV PILOT_DIR /go/src/github.com/AliyunContainerService/log-pilot
 ARG GOOS=linux
@@ -9,9 +9,9 @@ WORKDIR $PILOT_DIR
 COPY . $PILOT_DIR
 RUN go install 
 
-FROM alpine:3.6
+FROM alpine:3.9
 
-ENV FILEBEAT_VERSION=7.8.0
+ENV FILEBEAT_VERSION=8.5.3
 COPY assets/glibc/glibc-2.26-r0.apk /tmp/
 RUN sed -i "s/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g" /etc/apk/repositories && \
     apk update && \ 
@@ -19,7 +19,7 @@ RUN sed -i "s/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g" /etc/apk/repositories
     apk add ca-certificates && \
     apk add wget && \
     update-ca-certificates && \
-    wget https://mirrors.huaweicloud.com/filebeat/${FILEBEAT_VERSION}/filebeat-${FILEBEAT_VERSION}-linux-x86_64.tar.gz -P /tmp/ && \
+    https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-${FILEBEAT_VERSION}-linux-x86_64.tar.gz -P /tmp/ && \
     mkdir -p /etc/filebeat /var/lib/filebeat /var/log/filebeat && \
     tar zxf /tmp/filebeat-${FILEBEAT_VERSION}-linux-x86_64.tar.gz -C /tmp/ && \
     cp -rf /tmp/filebeat-${FILEBEAT_VERSION}-linux-x86_64/filebeat /usr/bin/ && \
