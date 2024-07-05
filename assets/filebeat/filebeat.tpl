@@ -4,7 +4,7 @@
 {{ else }}
 - type: log
 {{end}}
-  multiline.pattern: '^[[:space:]]+(at|\.{3})[[:space:]]+\b|^Caused by:'
+  multiline.pattern: '^[[:space:]]+(at|\.{3})|^[[:space:]]+|^$|^(Caused by|java|org|com|,)'
   multiline.negate: false
   multiline.match: after
   enabled: true
