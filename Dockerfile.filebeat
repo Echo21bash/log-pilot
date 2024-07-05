@@ -19,7 +19,7 @@ RUN sed -i "s/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g" /etc/apk/repositories
     apk add ca-certificates && \
     apk add wget && \
     update-ca-certificates && \
-    https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-${FILEBEAT_VERSION}-linux-x86_64.tar.gz -P /tmp/ && \
+    wget https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-${FILEBEAT_VERSION}-linux-x86_64.tar.gz -P /tmp/ && \
     mkdir -p /etc/filebeat /var/lib/filebeat /var/log/filebeat && \
     tar zxf /tmp/filebeat-${FILEBEAT_VERSION}-linux-x86_64.tar.gz -C /tmp/ && \
     cp -rf /tmp/filebeat-${FILEBEAT_VERSION}-linux-x86_64/filebeat /usr/bin/ && \
