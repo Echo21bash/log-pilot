@@ -1,36 +1,31 @@
-FROM golang:1.9-alpine3.6 as builder
-
-ENV PILOT_DIR /go/src/github.com/AliyunContainerService/log-pilot
+FROM golang:1.9-alpine3.6 AS builder
+ENV PILOT_DIR=/go/src/github.com/AliyunContainerService/log-pilot
 ARG GOOS=linux
 ARG GOARCH=amd64
 RUN sed -i "s/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g" /etc/apk/repositories
 RUN set -ex && apk add --no-cache make git
 WORKDIR $PILOT_DIR
 COPY . $PILOT_DIR
-RUN go install 
+RUN go install
 
-FROM alpine:3.6
+FROM fluentd:v1.14-1
+USER root
 COPY assets/glibc/glibc-2.26-r0.apk /tmp/
 
 RUN sed -i "s/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g" /etc/apk/repositories && \
-    apk update && \ 
-    apk add python && \
-    apk add ruby-json ruby-irb && \
-    apk add build-base ruby-dev && \
-    apk add python && \
-    apk add lsof && \
-    apk add ca-certificates wget && \
-    gem install fluentd -v 1.2.6 --no-ri --no-rdoc && \
-    gem install fluent-plugin-elasticsearch -v ">=2.0.0" --no-ri --no-rdoc && \
-    gem install gelf -v "~> 3.0.0" --no-ri --no-rdoc && \
-    gem install aliyun_sls_sdk -v ">=0.0.9" --no-ri --no-rdoc && \
-    gem install remote_syslog_logger -v ">=1.0.1" --no-ri --no-rdoc && \
-    gem install fluent-plugin-remote_syslog -v ">=0.2.1" --no-ri --no-rdoc && \
-    gem install fluent-plugin-kafka --no-ri --no-rdoc && \
-    gem install fluent-plugin-flowcounter --no-ri --no-rdoc && \
-    apk del build-base ruby-dev && \
+    apk add --no-cache --virtual .build-deps build-base linux-headers ruby-dev gnupg
+RUN apk add --no-cache  python2
+
+RUN gem install faraday -v 1.10.4 && \
+    gem install elasticsearch -v 6.0.0 && \
+    gem install fluent-plugin-elasticsearch -v 5.2.5 && \
+    gem install public_suffix -v 5.1.1 && \
+    gem install aliyun_sls_sdk -v ">=0.0.9"  && \
+    gem install remote_syslog_logger -v ">=1.0.1" && \
+    gem install fluent-plugin-remote_syslog -v ">=0.2.1" && \
+    gem install fluent-plugin-kafka  && \
+    gem install fluent-plugin-out-http && \
     rm -rf /root/.gem && \
-    apk add curl openssl && \
     apk add --allow-untrusted /tmp/glibc-2.26-r0.apk && \
     rm -rf /tmp/glibc-2.26-r0.apk
 

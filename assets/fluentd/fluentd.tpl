@@ -3,7 +3,7 @@
   @type tail
   tag docker.{{ $.containerId }}.{{ .Name }}
   path {{ .HostDir }}/{{ .File }}
-
+  exclude_path ["{{ .HostDir }}/*.gz", "{{ .HostDir }}/*.zip"]
   <parse>
   {{if .Stdout}}
   @type json
@@ -44,6 +44,7 @@
     {{range $key, $value := $.container}}
     {{ $key }} {{ $value }}
     {{end}}
+    @timestamp ${record['time']}
   </record>
 </filter>
 {{end}}
