@@ -46,6 +46,7 @@ EOF
 fluentd_options(){
 cat >> $FLUENTD_CONFIG << EOF
 <system>
+enable_msgpack_time_support true
 ${FLUENTD_LOG_LEVEL:+log_level $FLUENTD_LOG_LEVEL}
 </system>
 EOF
@@ -82,6 +83,7 @@ ${ELASTICSEARCH_PASSWORD:+password ${ELASTICSEARCH_PASSWORD}}
 ${ELASTICSEARCH_PATH:+path ${ELASTICSEARCH_PATH}}
 ${ELASTICSEARCH_SCHEME:+scheme ${ELASTICSEARCH_SCHEME}}
 ${ELASTICSEARCH_SSL_VERIFY:+ssl_verify ${ELASTICSEARCH_SSL_VERIFY}}
+utc_index false
 target_index_key _target
 type_name fluentd
 $(bufferd_output)

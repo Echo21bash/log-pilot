@@ -22,7 +22,7 @@
   keep_time_key true
   </parse>
 
-  read_from_head true
+  read_from_head false
   pos_file /pilot/pos/{{ $.containerId }}.{{ .Name }}.pos
 </source>
 
@@ -44,7 +44,7 @@
     {{range $key, $value := $.container}}
     {{ $key }} {{ $value }}
     {{end}}
-    @timestamp ${record['time']}
+    @timestamp ${Time.now.utc.iso8601}
   </record>
 </filter>
 {{end}}
