@@ -24,38 +24,34 @@ echo "@include conf.d/*.conf" >> $FLUENTD_CONFIG
 
 bufferd_output(){
 cat << EOF
-${FLUENTD_BUFFER_TYPE:+buffer_type $FLUENTD_BUFFER_TYPE}
-${FLUENTD_BUFFER_CHUNK_LIMIT:+buffer_chunk_limit $FLUENTD_BUFFER_CHUNK_LIMIT}
-${FLUENTD_BUFFER_QUEUE_LIMIT:+buffer_queue_limit $FLUENTD_BUFFER_QUEUE_LIMIT}
-${FLUENTD_BUFFER_CHUNK_LIMIT_SIZE:+chunk_limit_size ${FLUENTD_BUFFER_CHUNK_LIMIT_SIZE}}
-${FLUENTD_BUFFER_TOTAL_LIMIT_SIZE:+total_limit_size ${FLUENTD_BUFFER_TOTAL_LIMIT_SIZE}}
+${FLUENTD_BUFFER_TYPE:+@type ${FLUENTD_BUFFER_TYPE:-file}}
+path /var/log/fluentd-buffers/kubernetes.system.buffer
+${FLUENTD_BUFFER_CHUNK_LIMIT_SIZE:+chunk_limit_size ${FLUENTD_BUFFER_CHUNK_LIMIT_SIZE:-128M}}
+${FLUENTD_BUFFER_TOTAL_LIMIT_SIZE:+total_limit_size ${FLUENTD_BUFFER_TOTAL_LIMIT_SIZE:-2G}}
+${FLUENTD_BUFFER_QUEUE_LIMIT_LENGTH:+queue_limit_length ${FLUENTD_BUFFER_QUEUE_LIMIT_LENGTH:-16}}
 ${FLUENTD_BUFFER_CHUNK_FULL_THRESHOLD:+chunk_full_threshold ${FLUENTD_BUFFER_CHUNK_FULL_THRESHOLD}}
 ${FLUENTD_BUFFER_COMPRESS:+compress ${FLUENTD_BUFFER_COMPRESS}}
-${FLUENTD_FLUSH_INTERVAL:+flush_interval $FLUENTD_FLUSH_INTERVAL}
-${FLUENTD_FLUSH_MODE:+flush_mode ${FLUENTD_FLUSH_MODE}}
-${FLUENTD_FLUSH_THREAD_COUNT:+flush_thread_count ${FLUENTD_FLUSH_THREAD_COUNT}}
-${FLUENTD_FLUSH_AT_SHUTDOWN:+flush_at_shutdown $FLUENTD_FLUSH_AT_SHUTDOWN}
-${FLUENTD_DISABLE_RETRY_LIMIT:+disable_retry_limit $FLUENTD_DISABLE_RETRY_LIMIT}
-${FLUENTD_RETRY_LIMIT:+retry_limit $FLUENTD_RETRY_LIMIT}
-${FLUENTD_RETRY_WAIT:+retry_wait $FLUENTD_RETRY_WAIT}
-${FLUENTD_MAX_RETRY_WAIT:+max_retry_wait $FLUENTD_MAX_RETRY_WAIT}
-${FLUENTD_NUM_THREADS:+num_threads $FLUENTD_NUM_THREADS}
+${FLUENTD_FLUSH_INTERVAL:+flush_interval ${FLUENTD_FLUSH_INTERVAL:10s}}
+${FLUENTD_FLUSH_MODE:+flush_mode ${FLUENTD_FLUSH_MODE:-interval}}
+${FLUENTD_FLUSH_THREAD_COUNT:+flush_thread_count ${FLUENTD_FLUSH_THREAD_COUNT:-4}}
+${FLUENTD_FLUSH_AT_SHUTDOWN:+flush_at_shutdown ${FLUENTD_FLUSH_AT_SHUTDOWN}}
+${FLUENTD_RETRY_WAIT:+retry_wait ${FLUENTD_RETRY_WAIT:-3s}}
 EOF
 }
 
 fluentd_options(){
 cat >> $FLUENTD_CONFIG << EOF
 <system>
-enable_msgpack_time_support true
-${FLUENTD_LOG_LEVEL:+log_level $FLUENTD_LOG_LEVEL}
+  enable_msgpack_time_support true
+  ${FLUENTD_LOG_LEVEL:+log_level $FLUENTD_LOG_LEVEL}
 </system>
 EOF
 if [ "$FLUENTD_ENABLE_MONITOR" == "true" ]; then
 cat >> $FLUENTD_CONFIG << EOF
 <source>
-    @type monitor_agent
-    bind 0.0.0.0
-    port 24220
+  @type monitor_agent
+  bind 0.0.0.0
+  port 24220
 </source>
 EOF
 fi
@@ -74,40 +70,46 @@ if [ -z "$ELASTICSEARCH_HOSTS" ]; then
 fi
 
 cat >> $FLUENTD_CONFIG << EOF
-<match docker.**>
-@type elasticsearch
-hosts $ELASTICSEARCH_HOSTS
-reconnect_on_error true
-${ELASTICSEARCH_USER:+user ${ELASTICSEARCH_USER}}
-${ELASTICSEARCH_PASSWORD:+password ${ELASTICSEARCH_PASSWORD}}
-${ELASTICSEARCH_PATH:+path ${ELASTICSEARCH_PATH}}
-${ELASTICSEARCH_SCHEME:+scheme ${ELASTICSEARCH_SCHEME}}
-${ELASTICSEARCH_SSL_VERIFY:+ssl_verify ${ELASTICSEARCH_SSL_VERIFY}}
-utc_index false
-target_index_key _target
-type_name fluentd
-$(bufferd_output)
-</match>
+<label @NORMAL>
+  <match **>
+    @type elasticsearch
+    hosts $ELASTICSEARCH_HOSTS
+    reconnect_on_error true
+    ${ELASTICSEARCH_USER:+user ${ELASTICSEARCH_USER}}
+    ${ELASTICSEARCH_PASSWORD:+password ${ELASTICSEARCH_PASSWORD}}
+    ${ELASTICSEARCH_PATH:+path ${ELASTICSEARCH_PATH}}
+    ${ELASTICSEARCH_SCHEME:+scheme ${ELASTICSEARCH_SCHEME}}
+    ${ELASTICSEARCH_SSL_VERIFY:+ssl_verify ${ELASTICSEARCH_SSL_VERIFY}}
+    verify_es_version_at_startup false
+    default_elasticsearch_version ${ELASTICSEARCH_VERSION:-6} 
+    utc_index false
+    target_index_key _target
+    type_name fluentd
+    $(bufferd_output)
+  </match>
+</label>
 EOF
 }
 
 default(){
 echo "use default output"
 cat >> $FLUENTD_CONFIG << EOF
-<match docker.**>
-@type stdout
-</match>
+<label @NORMAL>
+  <match docker.**>
+    @type stdout
+  </match>
+</label>
 EOF
 }
 
 file(){
 assert_not_empty "$FILE_PATH" "FILE_PATH required"
 cat >> $FLUENTD_CONFIG << EOF
-<match docker.**>
+<match **>
 @type file
-path $FILE_PATH/\${docker_app}/\${docker_service}/\${docker_container}/\${tag[2]}.%Y-%m-%d
-append ${FILE_APPEND:=true}
-${FILE_COMPRESS:+compress ${FILE_COMPRESS}}
+  path $FILE_PATH/\${docker_app}/\${docker_service}/\${docker_container}/\${tag[2]}.%Y-%m-%d
+  append ${FILE_APPEND:=true}
+  ${FILE_COMPRESS:+compress ${FILE_COMPRESS}}
 <format>
   @type ${FILE_FORMAT:=json}
 </format>
@@ -127,14 +129,16 @@ graylog(){
 assert_not_empty "$GRAYLOG_HOST" "GRAYLOG_HOST required"
 assert_not_empty "$GRAYLOG_PORT" "GRAYLOG_PORT required"
 cat >> $FLUENTD_CONFIG << EOF
-<match docker.**>
-@type gelf
-host $GRAYLOG_HOST
-port $GRAYLOG_PORT
-protocol ${GRAYLOG_PROTOCOL:-udp}
-flush_interval 3s
-$(bufferd_output)
-</match>
+<label @NORMAL>
+  <match **>
+    @type gelf
+    host $GRAYLOG_HOST
+    port $GRAYLOG_PORT
+    protocol ${GRAYLOG_PROTOCOL:-udp}
+    flush_interval 3s
+    $(bufferd_output)
+  </match>
+</label>
 EOF
 }
 
@@ -185,50 +189,56 @@ EOF
 kafka(){
 assert_not_empty "$KAFKA_BROKERS" "KAFKA_BROKERS required"
 cat >> $FLUENTD_CONFIG << EOF
-<match docker.**>
-@type kafka_buffered
-brokers $KAFKA_BROKERS
-${KAFKA_DEFAULT_TOPIC:+default_topic $KAFKA_DEFAULT_TOPIC}
-${KAFKA_DEFAULT_PARTITION_KEY:+default_partition_key $KAFKA_default_partition_key}
-${KAFKA_DEFAULT_MESSAGE_KEY:+default_message_key $KAFKA_default_message_key}
-${KAFKA_OUTPUT_DATA_TYPE:+output_data_type $KAFKA_OUTPUT_DATA_TYPE}
-${KAFKA_OUTPUT_INCLUDE_TAG:+output_include_tag $KAFKA_OUTPUT_INCLUDE_TAG}
-${KAFKA_OUTPUT_INCLUDE_TIME:+output_include_time $KAFKA_OUTPUT_INCLUDE_TIME}
-${KAFKA_EXCLUDE_TOPIC_KEY:+exclude_topic_key $KAFKA_EXCLUDE_TOPIC_KEY}
-${KAFKA_EXCLUDE_PARTITION_KEY:+exclude_partition_key $KAFKA_EXCLUDE_PARTITION_KEY}
-${KAFKA_GET_KAFKA_CLIENT_LOG:+get_kafka_client_log $KAFKA_GET_KAFKA_CLIENT_LOG}
-${KAFKA_MAX_SEND_RETRIES:+max_send_retries $KAFKA_MAX_SEND_RETRIES}
-${KAFKA_REQUIRED_ACKS:+required_acks $KAFKA_REQUIRED_ACKS}
-${KAFKA_ACK_TIMEOUT:+ack_timeout $KAFKA_ACK_TIMEOUT}
-${KAFKA_COMPRESSION_CODEC:+compression_codec $KAFKA_COMPRESSION_CODEC}
-${KAFKA_KAFKA_AGG_MAX_BYTES:+kafka_agg_max_bytes $KAFKA_KAFKA_AGG_MAX_BYTES}
-${KAFKA_KAFKA_AGG_MAX_MESSAGES:+kafka_agg_max_messages $KAFKA_KAFKA_AGG_MAX_MESSAGES}
-${KAFKA_MAX_SEND_LIMIT_BYTES:+max_send_limit_bytes $KAFKA_MAX_SEND_LIMIT_BYTES}
-${KAFKA_DISCARD_KAFKA_DELIVERY_FAILED:+discard_kafka_delivery_failed $KAFKA_DISCARD_KAFKA_DELIVERY_FAILED}
-$(bufferd_output)
-</match>
+<label @NORMAL>
+  <match **>
+    @type kafka_buffered
+    brokers $KAFKA_BROKERS
+    ${KAFKA_DEFAULT_TOPIC:+default_topic $KAFKA_DEFAULT_TOPIC}
+    ${KAFKA_DEFAULT_PARTITION_KEY:+default_partition_key $KAFKA_default_partition_key}
+    ${KAFKA_DEFAULT_MESSAGE_KEY:+default_message_key $KAFKA_default_message_key}
+    ${KAFKA_OUTPUT_DATA_TYPE:+output_data_type $KAFKA_OUTPUT_DATA_TYPE}
+    ${KAFKA_OUTPUT_INCLUDE_TAG:+output_include_tag $KAFKA_OUTPUT_INCLUDE_TAG}
+    ${KAFKA_OUTPUT_INCLUDE_TIME:+output_include_time $KAFKA_OUTPUT_INCLUDE_TIME}
+    ${KAFKA_EXCLUDE_TOPIC_KEY:+exclude_topic_key $KAFKA_EXCLUDE_TOPIC_KEY}
+    ${KAFKA_EXCLUDE_PARTITION_KEY:+exclude_partition_key $KAFKA_EXCLUDE_PARTITION_KEY}
+    ${KAFKA_GET_KAFKA_CLIENT_LOG:+get_kafka_client_log $KAFKA_GET_KAFKA_CLIENT_LOG}
+    ${KAFKA_MAX_SEND_RETRIES:+max_send_retries $KAFKA_MAX_SEND_RETRIES}
+    ${KAFKA_REQUIRED_ACKS:+required_acks $KAFKA_REQUIRED_ACKS}
+    ${KAFKA_ACK_TIMEOUT:+ack_timeout $KAFKA_ACK_TIMEOUT}
+    ${KAFKA_COMPRESSION_CODEC:+compression_codec $KAFKA_COMPRESSION_CODEC}
+    ${KAFKA_KAFKA_AGG_MAX_BYTES:+kafka_agg_max_bytes $KAFKA_KAFKA_AGG_MAX_BYTES}
+    ${KAFKA_KAFKA_AGG_MAX_MESSAGES:+kafka_agg_max_messages $KAFKA_KAFKA_AGG_MAX_MESSAGES}
+    ${KAFKA_MAX_SEND_LIMIT_BYTES:+max_send_limit_bytes $KAFKA_MAX_SEND_LIMIT_BYTES}
+    ${KAFKA_DISCARD_KAFKA_DELIVERY_FAILED:+discard_kafka_delivery_failed $KAFKA_DISCARD_KAFKA_DELIVERY_FAILED}
+    $(bufferd_output)
+  </match>
+</label>
 EOF
 }
 
 null(){
 cat >> $FLUENTD_CONFIG << EOF
-<match docker.**>
-@type null
-</match>
+<label @NORMAL>
+  <match **>
+   @type null
+  </match>
+</label>
 EOF
 }
 
 flowcounter() {
 cat >> $FLUENTD_CONFIG << EOF
-<match docker.**>
-@type flowcounter
-tag flowcounter
-count_interval 30s
-aggregate all
-</match>
-<match flowcounter>
-@type stdout
-</match>
+<label @NORMAL>
+  <match **>
+    @type flowcounter
+    tag flowcounter
+    count_interval 30s
+    aggregate all
+  </match>
+  <match flowcounter>
+    @type stdout
+  </match>
+</label>
 EOF
 }
 
