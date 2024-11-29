@@ -54,8 +54,8 @@
     {{end}}
     @timestamp ${Time.now.utc.iso8601}
     message ${record["log"]}
-    remove_keys log
   </record>
+    remove_keys log
 </filter>
 
 <match docker.{{ $.containerId }}.{{ .Name }}>
