@@ -24,18 +24,26 @@ echo "@include conf.d/*.conf" >> $FLUENTD_CONFIG
 
 bufferd_output(){
 cat << EOF
-  ${FLUENTD_BUFFER_TYPE:+@type ${FLUENTD_BUFFER_TYPE:-file}}
+  @type ${FLUENTD_BUFFER_TYPE:-file}
+EOF
+
+if [ ${FLUENTD_BUFFER_TYPE} == 'file' ];then
+cat << EOF
   path /var/log/fluentd-buffers/kubernetes.system.buffer
-  ${FLUENTD_BUFFER_CHUNK_LIMIT_SIZE:+chunk_limit_size ${FLUENTD_BUFFER_CHUNK_LIMIT_SIZE:-128M}}
-  ${FLUENTD_BUFFER_TOTAL_LIMIT_SIZE:+total_limit_size ${FLUENTD_BUFFER_TOTAL_LIMIT_SIZE:-2G}}
-  ${FLUENTD_BUFFER_QUEUE_LIMIT_LENGTH:+queue_limit_length ${FLUENTD_BUFFER_QUEUE_LIMIT_LENGTH:-16}}
+EOF
+fi
+
+cat << EOF
+  chunk_limit_size ${FLUENTD_BUFFER_CHUNK_LIMIT_SIZE:-128M}
+  total_limit_size ${FLUENTD_BUFFER_TOTAL_LIMIT_SIZE:-2G}
+  queue_limit_length ${FLUENTD_BUFFER_QUEUE_LIMIT_LENGTH:-16}
+  flush_interval ${FLUENTD_FLUSH_INTERVAL:10s}
+  flush_mode ${FLUENTD_FLUSH_MODE:-interval}
+  flush_thread_count ${FLUENTD_FLUSH_THREAD_COUNT:-4}
+  retry_wait ${FLUENTD_RETRY_WAIT:-3s}
   ${FLUENTD_BUFFER_CHUNK_FULL_THRESHOLD:+chunk_full_threshold ${FLUENTD_BUFFER_CHUNK_FULL_THRESHOLD}}
   ${FLUENTD_BUFFER_COMPRESS:+compress ${FLUENTD_BUFFER_COMPRESS}}
-  ${FLUENTD_FLUSH_INTERVAL:+flush_interval ${FLUENTD_FLUSH_INTERVAL:10s}}
-  ${FLUENTD_FLUSH_MODE:+flush_mode ${FLUENTD_FLUSH_MODE:-interval}}
-  ${FLUENTD_FLUSH_THREAD_COUNT:+flush_thread_count ${FLUENTD_FLUSH_THREAD_COUNT:-4}}
   ${FLUENTD_FLUSH_AT_SHUTDOWN:+flush_at_shutdown ${FLUENTD_FLUSH_AT_SHUTDOWN}}
-  ${FLUENTD_RETRY_WAIT:+retry_wait ${FLUENTD_RETRY_WAIT:-3s}}
 EOF
 }
 
