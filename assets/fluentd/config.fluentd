@@ -27,7 +27,7 @@ cat << EOF
   @type ${FLUENTD_BUFFER_TYPE:-file}
 EOF
 
-if [ ${FLUENTD_BUFFER_TYPE} == 'file' ];then
+if [ ${FLUENTD_BUFFER_TYPE:-file} == 'file' ];then
 cat << EOF
   path /var/log/fluentd-buffers/kubernetes.system.buffer
 EOF
