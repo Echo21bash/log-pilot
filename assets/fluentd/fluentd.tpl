@@ -26,6 +26,24 @@
   pos_file /pilot/pos/{{ $.containerId }}.{{ .Name }}.pos
 </source>
 
+{{if .Stdout}}
+<filter docker.{{ $.containerId }}.{{ .Name }}>
+  @type parser
+  key_name log
+  <parse>
+    @type multi_format
+    <pattern>
+     {{ if and (ne .Format "none") (ne .Format "nginx" ) (ne .Format "json" ) (ne .Format "csv" ) (ne .Format "apache2" ) }}
+      format regexp
+      expression {{ .Format }}
+      {{else}}
+      format {{ .Format }}
+      {{end}}
+    </pattern>
+  </parse>
+</filter>
+{{end}}
+
 <filter docker.{{ $.containerId }}.{{ .Name }}>
   @type concat
   key log
