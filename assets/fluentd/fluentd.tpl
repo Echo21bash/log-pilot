@@ -33,7 +33,7 @@
   <parse>
     @type multi_format
     <pattern>
-     {{ if and (ne .Format "none") (ne .Format "nginx" ) (ne .Format "json" ) (ne .Format "csv" ) (ne .Format "apache2" ) }}
+     {{ if and (ne .Format "nonex") (ne .Format "nginx" ) (ne .Format "json" ) (ne .Format "csv" ) (ne .Format "apache2" ) }}
       format regexp
       expression {{ .Format }}
       {{else}}
@@ -46,11 +46,11 @@
 
 <filter docker.{{ $.containerId }}.{{ .Name }}>
   @type concat
-  key log
+  key message
   stream_identity_key container_id
-  multiline_start_regexp /^(\d{4}-\d{1,2}-\d{1,2}|\[\w+\]\s)/
+  multiline_start_regexp /^(\d{4}-\d{1,2}-\d{1,2}|\[\w+\]\s|\{)/
   separator ""
-  flush_interval 10
+  flush_interval 0
   timeout_label @NORMAL
 </filter>
 
@@ -71,9 +71,7 @@
     {{ $key }} {{ $value }}
     {{end}}
     @timestamp ${Time.now.utc.iso8601}
-    message ${record["log"]}
   </record>
-    remove_keys log
 </filter>
 
 <match docker.{{ $.containerId }}.{{ .Name }}>
