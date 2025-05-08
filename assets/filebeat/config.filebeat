@@ -150,6 +150,7 @@ output.kafka:
     ${KAFKA_VERSION:+version: ${KAFKA_VERSION}}
     ${KAFKA_USERNAME:+username: ${KAFKA_USERNAME}}
     ${KAFKA_PASSWORD:+password: ${KAFKA_PASSWORD}}
+    ${KAFKA_MECHANISM:+sasl.mechanism: ${KAFKA_MECHANISM}}
     ${KAFKA_WORKER:+worker: ${KAFKA_WORKER}}
     ${KAFKA_PARTITION_KEY:+key: ${KAFKA_PARTITION_KEY}}
     ${KAFKA_PARTITION:+partition: ${KAFKA_PARTITION}}
